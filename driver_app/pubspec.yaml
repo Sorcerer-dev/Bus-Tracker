@@ -1,0 +1,11 @@
+name: driver_app
+description: A simple app that sends GPS coordinates to the server.
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^0.13.6
+  location: ^5.0.3
