@@ -1,54 +1,56 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
-import axios from 'axios';
-
-type BusLocation = {
-  lat: number;
-  lon: number;
-  timestamp: string;
-};
+import * as Location from 'expo-location';
 
 export default function HomeScreen() {
-  const [busLocation, setBusLocation] = useState<BusLocation | null>(null);
+  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchBusLocation = async () => {
-      try {
-        const res = await axios.get<BusLocation>('http://192.168.67.43:5000/bus-location/BUS001');
-        console.log("Bus data:", res.data);
-        setBusLocation(res.data);
-      } catch (error) {
-        console.error("Error fetching bus location:", error);
+    (async () => {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('Permission to access location was denied');
+        setLoading(false);
+        return;
       }
-    };
 
-    fetchBusLocation();
-    const interval = setInterval(fetchBusLocation, 5000);
-    return () => clearInterval(interval);
+      let currentLocation = await Location.getCurrentPositionAsync({});
+      setLocation({
+        latitude: currentLocation.coords.latitude,
+        longitude: currentLocation.coords.longitude,
+      });
+      setLoading(false);
+    })();
   }, []);
+
+  if (loading || !location) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <MapView
         style={styles.map}
         initialRegion={{
-          latitude: 18.52,
-          longitude: 73.85,
+          latitude: location.latitude,
+          longitude: location.longitude,
           latitudeDelta: 0.01,
           longitudeDelta: 0.01,
         }}
+        showsUserLocation={true}
       >
-        {busLocation?.lat != null && busLocation?.lon != null && (
-          <Marker
-            coordinate={{
-              latitude: busLocation.lat,
-              longitude: busLocation.lon,
-            }}
-            title="Bus Location"
-            description={`Last updated: ${new Date(busLocation.timestamp).toLocaleTimeString()}`}
-          />
-        )}
+        <Marker
+          coordinate={location}
+          title="You are here"
+          description="This is your current location"
+          pinColor="blue"
+        />
       </MapView>
     </View>
   );
@@ -56,10 +58,15 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1
+    flex: 1,
   },
   map: {
     width: '100%',
     height: '100%',
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
