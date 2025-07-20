@@ -1,17 +1,16 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, StyleSheet, Text } from 'react-native';
+import { View, StyleSheet, Text, Image } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
+import axios from 'axios';
 
 export default function IndexScreen() {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [busLocation, setBusLocation] = useState<{ latitude: number; longitude: number }>({
-    latitude: 11.0168,
-    longitude: 76.9558,
-  });
+  const [busLocation, setBusLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const mapRef = useRef<MapView | null>(null);
 
+  // Get user location
   useEffect(() => {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -28,26 +27,27 @@ export default function IndexScreen() {
     })();
   }, []);
 
-  // Simulate moving bus
+  // Fetch bus location every 3s
   useEffect(() => {
-    const interval = setInterval(() => {
-      setBusLocation((prev) => {
-        const newLocation = {
-          latitude: prev.latitude + 0.001,
-          longitude: prev.longitude + 0.001,
-        };
+    const interval = setInterval(async () => {
+      try {
+        const response = await axios.get('http://192.168.67.43:5000/bus-location/BUS001');
+        const { latitude, lat, longitude, lon } = response.data;
 
-        // Optional: animate camera to bus
-        mapRef.current?.animateToRegion({
-          latitude: newLocation.latitude,
-          longitude: newLocation.longitude,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        }, 1000);
+        const busLat = latitude ?? lat;
+        const busLon = longitude ?? lon;
 
-        return newLocation;
-      });
-    }, 2000);
+        if (busLat && busLon) {
+          const location = { latitude: busLat, longitude: busLon };
+          setBusLocation(location);
+          mapRef.current?.animateToRegion({ ...location, latitudeDelta: 0.05, longitudeDelta: 0.05 }, 1000);
+        } else {
+          console.warn("No coordinates found in bus location");
+        }
+      } catch (error) {
+        console.error('Error fetching bus location:', error);
+      }
+    }, 3000);
 
     return () => clearInterval(interval);
   }, []);
@@ -63,23 +63,27 @@ export default function IndexScreen() {
     <View style={styles.container}>
       {errorMsg && <Text>{errorMsg}</Text>}
       <MapView
-        ref={(ref) => (mapRef.current = ref)}
+        ref={(ref) => { mapRef.current = ref; }}
         style={styles.map}
         provider={PROVIDER_GOOGLE}
         region={defaultRegion}
       >
         {userLocation && (
-          <Marker
-            coordinate={userLocation}
-            title="You"
-            pinColor="blue"
-          />
+          <Marker coordinate={userLocation} title="You">
+              <Image
+                source={require('../../assets/images/user-location.png')}  // Your selected icon
+                style={{ width: 40, height: 40, resizeMode: 'contain' }}
+              />
+            </Marker>
         )}
-        <Marker
-          coordinate={busLocation}
-          title="Bus (Simulated)"
-          pinColor="red"
-        />
+        {busLocation && (
+            <Marker coordinate={busLocation} title="Bus">
+              <Image
+                source={require('../../assets/images/bus.png')}
+                style={{ width: 20, height: 20, resizeMode: 'contain' }}
+              />
+            </Marker>
+)}
       </MapView>
     </View>
   );
