@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, render_template_string
 from datetime import datetime
-from routes.location import location_bp, bus_locations  # import bus_locations dictionary
+from routes.location import location_bp, bus_locations  # Import the shared dictionary
 
 app = Flask(__name__)
 app.register_blueprint(location_bp)
@@ -11,7 +11,6 @@ def home():
 
 @app.route('/live')
 def live_view():
-    # You can adjust this to display any bus_id you like
     bus_id = "BUS001"
     bus = bus_locations.get(bus_id)
 
