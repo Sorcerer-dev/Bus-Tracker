@@ -31,7 +31,7 @@ export default function IndexScreen() {
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const response = await axios.get('https://bus-tracker-ax2d.onrender.com');
+        const response = await axios.get('https://tracker-bpkz.onrender.com');
         const { latitude, lat, longitude, lon } = response.data;
 
         const busLat = latitude ?? lat;

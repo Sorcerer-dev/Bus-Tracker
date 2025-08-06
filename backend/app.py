@@ -1,5 +1,7 @@
 from flask import Flask, jsonify, render_template_string
 from datetime import datetime
+import os
+
 from routes.location import location_bp, bus_locations  # Import the shared dictionary
 
 app = Flask(__name__)
@@ -34,4 +36,5 @@ def live_view():
     return render_template_string(html)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))  # Use Render's port or default to 5000
+    app.run(host='0.0.0.0', port=port)
