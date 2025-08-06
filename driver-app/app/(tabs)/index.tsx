@@ -8,7 +8,7 @@ export default function App() {
   const [locationWatcher, setLocationWatcher] = useState<Location.LocationSubscription | null>(null);
 
   const startTracking = async () => {
-    let { status } = await Location.requestForegroundPermissionsAsync();
+    const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission Denied', 'Location permission is required.');
       return;
@@ -16,9 +16,10 @@ export default function App() {
 
     const watcher = await Location.watchPositionAsync(
       { accuracy: Location.Accuracy.High, timeInterval: 5000, distanceInterval: 10 },
-      (loc: Location.LocationObject) => {
-        console.log("Location:", loc.coords);
-        sendLocationToServer(loc.coords.latitude, loc.coords.longitude);
+      (loc) => {
+        if (loc?.coords) {
+          sendLocationToServer(loc.coords.latitude, loc.coords.longitude);
+        }
       }
     );
 
@@ -27,10 +28,8 @@ export default function App() {
   };
 
   const stopTracking = () => {
-    if (locationWatcher) {
-      locationWatcher.remove();
-      setLocationWatcher(null);
-    }
+    locationWatcher?.remove();
+    setLocationWatcher(null);
     setIsTracking(false);
   };
 
@@ -38,23 +37,22 @@ export default function App() {
     isTracking ? stopTracking() : startTracking();
   };
 
-  const sendLocationToServer = async (lat: number, lng: number) => {
-  try {
-    await axios.post('http://192.168.67.43:5000/location', {
-      bus_id: 'BUS001',
-      lat: lat,
-      lon: lng,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    if (error instanceof Error) {
-      console.error('Error sending location:', error.message);
-    } else {
-      console.error('Unknown error occurred while sending location');
+  const sendLocationToServer = async (lat: number, lon: number) => {
+    try {
+      await axios.post('http://192.168.67.43:5000/location', {
+        bus_id: 'BUS001',
+        lat,
+        lon,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error('Error sending location:', error.message);
+      } else {
+        console.error('Unknown error sending location');
+      }
     }
-  }
-};
-
+  };
 
   return (
     <View style={styles.container}>
@@ -75,6 +73,5 @@ const styles = StyleSheet.create({
   button: { paddingVertical: 15, paddingHorizontal: 30, borderRadius: 10 },
   startButton: { backgroundColor: 'red' },
   stopButton: { backgroundColor: 'green' },
-  buttonText: { color: 'white', fontSize: 18, fontWeight: 'bold' }
+  buttonText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
 });
-``
