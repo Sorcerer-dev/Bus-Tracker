@@ -39,7 +39,7 @@ export default function App() {
 
   const sendLocationToServer = async (lat: number, lon: number) => {
     try {
-      await axios.post('http://192.168.67.43:5000/location', {
+      await axios.post('https://bus-tracker-ax2d.onrender.com', {
         bus_id: 'BUS001',
         lat,
         lon,
