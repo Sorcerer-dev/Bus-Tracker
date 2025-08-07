@@ -1,28 +1,36 @@
 from flask import Blueprint, request, jsonify
 from utils.eta import calculate_eta
+from datetime import datetime
+from flask_cors import cross_origin
 
 location_bp = Blueprint('location', __name__)
-bus_locations = {}
+bus_locations = {}  # Temporary in-memory storage
 
 @location_bp.route('/location', methods=['POST'])
+@cross_origin()
 def update_location():
-    data = request.json
-    bus_id = data.get('bus_id')
-    lat = data.get('lat')
-    lon = data.get('lon')
-    timestamp = data.get('timestamp')
+    try:
+        data = request.json
+        bus_id = data.get('bus_id')
+        lat = float(data.get('lat'))
+        lon = float(data.get('lon'))
+        timestamp = data.get('timestamp') or datetime.utcnow().isoformat()
 
-    if not bus_id or lat is None or lon is None:
-        return jsonify({'error': 'Missing bus_id or coordinates'}), 400
+        if not bus_id:
+            return jsonify({'error': 'Missing bus_id'}), 400
 
-    bus_locations[bus_id] = {
-        'lat': lat,
-        'lon': lon,
-        'timestamp': timestamp
-    }
-    return jsonify({'status': 'updated'})
+        bus_locations[bus_id] = {
+            'lat': lat,
+            'lon': lon,
+            'timestamp': timestamp
+        }
+        return jsonify({'status': 'updated'})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @location_bp.route('/bus-location/<bus_id>', methods=['GET'])
+@cross_origin()
 def get_bus_location(bus_id):
     location = bus_locations.get(bus_id)
     if not location:
@@ -30,14 +38,19 @@ def get_bus_location(bus_id):
     return jsonify(location)
 
 @location_bp.route('/eta', methods=['GET'])
+@cross_origin()
 def get_eta():
-    bus_id = request.args.get('bus_id')
-    stop_lat = request.args.get('stop_lat')
-    stop_lon = request.args.get('stop_lon')
+    try:
+        bus_id = request.args.get('bus_id')
+        stop_lat = float(request.args.get('stop_lat'))
+        stop_lon = float(request.args.get('stop_lon'))
 
-    bus = bus_locations.get(bus_id)
-    if not bus or stop_lat is None or stop_lon is None:
-        return jsonify({'error': 'Missing data for ETA calculation'}), 400
+        bus = bus_locations.get(bus_id)
+        if not bus:
+            return jsonify({'error': 'Bus not found'}), 404
 
-    eta = calculate_eta(bus['lat'], bus['lon'], float(stop_lat), float(stop_lon))
-    return jsonify({'eta_minutes': eta})
+        eta = calculate_eta(bus['lat'], bus['lon'], stop_lat, stop_lon)
+        return jsonify({'eta_minutes': eta})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

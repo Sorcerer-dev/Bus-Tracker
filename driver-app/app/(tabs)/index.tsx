@@ -1,56 +1,55 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import * as Location from 'expo-location';
 import axios from 'axios';
+import Constants from 'expo-constants';
+import * as TaskManager from 'expo-task-manager';
+import * as BackgroundFetch from 'expo-background-fetch';
+
+const BUS_ID = Constants.manifest?.extra?.BUS_ID || 'BUS001';
+const SERVER_URL = 'https://tracker-bpkz.onrender.com/location';
+const TASK_NAME = 'BACKGROUND_LOCATION_TASK';
+
+TaskManager.defineTask(TASK_NAME, async () => {
+  try {
+    const location = await Location.getCurrentPositionAsync({});
+    const { latitude, longitude } = location.coords;
+    await axios.post(SERVER_URL, {
+      bus_id: BUS_ID,
+      lat: latitude,
+      lon: longitude,
+      timestamp: new Date().toISOString(),
+    });
+    return BackgroundFetch.BackgroundFetchResult.NewData;
+  } catch (error) {
+    console.error('Background task error:', error);
+    return BackgroundFetch.BackgroundFetchResult.Failed;
+  }
+});
 
 export default function App() {
   const [isTracking, setIsTracking] = useState(false);
-  const [locationWatcher, setLocationWatcher] = useState<Location.LocationSubscription | null>(null);
 
-  const startTracking = async () => {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission Denied', 'Location permission is required.');
-      return;
-    }
-
-    const watcher = await Location.watchPositionAsync(
-      { accuracy: Location.Accuracy.High, timeInterval: 5000, distanceInterval: 10 },
-      (loc) => {
-        if (loc?.coords) {
-          sendLocationToServer(loc.coords.latitude, loc.coords.longitude);
-        }
+  const toggleTracking = async () => {
+    if (isTracking) {
+      await Location.stopLocationUpdatesAsync(TASK_NAME);
+      setIsTracking(false);
+    } else {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Location permission is required.');
+        return;
       }
-    );
-
-    setLocationWatcher(watcher);
-    setIsTracking(true);
-  };
-
-  const stopTracking = () => {
-    locationWatcher?.remove();
-    setLocationWatcher(null);
-    setIsTracking(false);
-  };
-
-  const toggleTracking = () => {
-    isTracking ? stopTracking() : startTracking();
-  };
-
-  const sendLocationToServer = async (lat: number, lon: number) => {
-    try {
-      await axios.post('https://tracker-bpkz.onrender.com', {
-        bus_id: 'BUS001',
-        lat,
-        lon,
-        timestamp: new Date().toISOString(),
+      await Location.startLocationUpdatesAsync(TASK_NAME, {
+        accuracy: Location.Accuracy.High,
+        timeInterval: 5000,
+        distanceInterval: 10,
+        foregroundService: {
+          notificationTitle: 'Tracking Bus Location',
+          notificationBody: 'Your bus location is being shared.',
+        },
       });
-    } catch (error) {
-      if (error instanceof Error) {
-        console.error('Error sending location:', error.message);
-      } else {
-        console.error('Unknown error sending location');
-      }
+      setIsTracking(true);
     }
   };
 
