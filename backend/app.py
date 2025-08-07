@@ -1,19 +1,21 @@
 from flask import Flask, jsonify, render_template_string
 from datetime import datetime
 import os
-
-from routes.location import location_bp, bus_locations  # Import the shared dictionary
+from flask_cors import CORS
+from routes.location import location_bp
 
 app = Flask(__name__)
+CORS(app)
 app.register_blueprint(location_bp)
 
 @app.route('/')
 def home():
-    return "🚌 Bus Tracking API is running!"
+    return "\U0001F68C Bus Tracking API is running!"
 
 @app.route('/live')
 def live_view():
     bus_id = "BUS001"
+    from routes.location import bus_locations  # re-import to get updated values
     bus = bus_locations.get(bus_id)
 
     if not bus:
@@ -36,5 +38,5 @@ def live_view():
     return render_template_string(html)
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))  # Use Render's port or default to 5000
+    port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)

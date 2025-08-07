@@ -1,8 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, StyleSheet, Text, Image } from 'react-native';
+import { View, StyleSheet, Text, Image, Alert } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import axios from 'axios';
+import Constants from 'expo-constants';
+
+const BUS_ID = Constants.manifest?.extra?.BUS_ID || 'BUS001';
+const SERVER_URL = `https://tracker-bpkz.onrender.com/bus-location/${BUS_ID}`;
 
 export default function IndexScreen() {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -18,7 +22,6 @@ export default function IndexScreen() {
         setErrorMsg('Permission to access location was denied');
         return;
       }
-
       const location = await Location.getCurrentPositionAsync({});
       setUserLocation({
         latitude: location.coords.latitude,
@@ -27,29 +30,31 @@ export default function IndexScreen() {
     })();
   }, []);
 
-  // Fetch bus location every 3s
+  // Fetch bus location
   useEffect(() => {
-    const interval = setInterval(async () => {
+    let isMounted = true;
+    const fetchLocation = async () => {
       try {
-        const response = await axios.get('https://tracker-bpkz.onrender.com');
-        const { latitude, lat, longitude, lon } = response.data;
-
-        const busLat = latitude ?? lat;
-        const busLon = longitude ?? lon;
-
-        if (busLat && busLon) {
-          const location = { latitude: busLat, longitude: busLon };
-          setBusLocation(location);
-          mapRef.current?.animateToRegion({ ...location, latitudeDelta: 0.05, longitudeDelta: 0.05 }, 1000);
-        } else {
-          console.warn("No coordinates found in bus location");
+        const response = await axios.get(SERVER_URL);
+        const { lat, lon } = response.data;
+        if (lat && lon) {
+          const location = { latitude: lat, longitude: lon };
+          if (isMounted) {
+            setBusLocation(location);
+            mapRef.current?.animateToRegion({ ...location, latitudeDelta: 0.05, longitudeDelta: 0.05 }, 1000);
+          }
         }
       } catch (error) {
-        console.error('Error fetching bus location:', error);
+        setErrorMsg("Failed to fetch bus location");
+        console.error(error);
       }
-    }, 3000);
+    };
 
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchLocation, 3000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   const defaultRegion: Region = {
@@ -70,20 +75,14 @@ export default function IndexScreen() {
       >
         {userLocation && (
           <Marker coordinate={userLocation} title="You">
-              <Image
-                source={require('../../assets/images/user-location.png')}  // Your selected icon
-                style={{ width: 40, height: 40, resizeMode: 'contain' }}
-              />
-            </Marker>
+            <Image source={require('../../assets/images/user-location.png')} style={{ width: 40, height: 40, resizeMode: 'contain' }} />
+          </Marker>
         )}
         {busLocation && (
-            <Marker coordinate={busLocation} title="Bus">
-              <Image
-                source={require('../../assets/images/bus.png')}
-                style={{ width: 20, height: 20, resizeMode: 'contain' }}
-              />
-            </Marker>
-)}
+          <Marker coordinate={busLocation} title="Bus">
+            <Image source={require('../../assets/images/bus.png')} style={{ width: 20, height: 20, resizeMode: 'contain' }} />
+          </Marker>
+        )}
       </MapView>
     </View>
   );
