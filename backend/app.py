@@ -36,6 +36,9 @@ def live_view():
     </html>
     """
     return render_template_string(html)
+@app.route("/ping")
+def ping():
+    return {"status": "ok"}, 200
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
