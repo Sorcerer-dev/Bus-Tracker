@@ -1,17 +1,22 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, StyleSheet, Text, Image, Alert } from 'react-native';
+import { View, StyleSheet, Text, Image } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import axios from 'axios';
 import Constants from 'expo-constants';
+import { API_BASE_URL } from '../../config';  // ✅ Use same config as login
 
 const BUS_ID = Constants.manifest?.extra?.BUS_ID || 'BUS001';
-const SERVER_URL = `https://tracker-bpkz.onrender.com/bus-location/${BUS_ID}`;
+
+// ✅ No hardcoded URLs now
+const SERVER_URL = `${API_BASE_URL}/bus-location/${BUS_ID}`;
+const ETA_URL = `${API_BASE_URL}/eta`;
 
 export default function IndexScreen() {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [busLocation, setBusLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [eta, setEta] = useState<string | null>(null);
   const mapRef = useRef<MapView | null>(null);
 
   // Get user location
@@ -30,9 +35,10 @@ export default function IndexScreen() {
     })();
   }, []);
 
-  // Fetch bus location
+  // Fetch bus location & ETA
   useEffect(() => {
     let isMounted = true;
+
     const fetchLocation = async () => {
       try {
         const response = await axios.get(SERVER_URL);
@@ -42,6 +48,23 @@ export default function IndexScreen() {
           if (isMounted) {
             setBusLocation(location);
             mapRef.current?.animateToRegion({ ...location, latitudeDelta: 0.05, longitudeDelta: 0.05 }, 1000);
+          }
+
+          // If we have both user & bus location, get ETA
+          if (userLocation && location) {
+            try {
+              const etaRes = await axios.post(ETA_URL, {
+                bus_lat: location.latitude,
+                bus_lon: location.longitude,
+                user_lat: userLocation.latitude,
+                user_lon: userLocation.longitude,
+              });
+              if (etaRes.data?.eta) {
+                setEta(etaRes.data.eta);
+              }
+            } catch (err) {
+              console.error("Failed to fetch ETA:", err);
+            }
           }
         }
       } catch (error) {
@@ -55,7 +78,7 @@ export default function IndexScreen() {
       isMounted = false;
       clearInterval(interval);
     };
-  }, []);
+  }, [userLocation]);
 
   const defaultRegion: Region = {
     latitude: userLocation?.latitude || 11.1271,
@@ -66,6 +89,11 @@ export default function IndexScreen() {
 
   return (
     <View style={styles.container}>
+      {eta && (
+        <View style={styles.etaContainer}>
+          <Text style={styles.etaText}>ETA: {eta}</Text>
+        </View>
+      )}
       {errorMsg && <Text>{errorMsg}</Text>}
       <MapView
         ref={(ref) => { mapRef.current = ref; }}
@@ -91,4 +119,20 @@ export default function IndexScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { flex: 1 },
+  etaContainer: {
+    position: 'absolute',
+    top: 40,
+    left: 0,
+    right: 0,
+    zIndex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  etaText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
 });

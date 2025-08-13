@@ -1,11 +1,12 @@
 from flask import Blueprint, request, jsonify
-from utils.eta import calculate_eta
+from utils.eta import estimate_eta
 from datetime import datetime
 from flask_cors import cross_origin
 
 location_bp = Blueprint('location', __name__)
 bus_locations = {}  # Temporary in-memory storage
 
+# 📍 Update bus location
 @location_bp.route('/location', methods=['POST'])
 @cross_origin()
 def update_location():
@@ -29,6 +30,8 @@ def update_location():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
+# 📍 Get bus location
 @location_bp.route('/bus-location/<bus_id>', methods=['GET'])
 @cross_origin()
 def get_bus_location(bus_id):
@@ -36,21 +39,3 @@ def get_bus_location(bus_id):
     if not location:
         return jsonify({'error': 'Location not found'}), 404
     return jsonify(location)
-
-@location_bp.route('/eta', methods=['GET'])
-@cross_origin()
-def get_eta():
-    try:
-        bus_id = request.args.get('bus_id')
-        stop_lat = float(request.args.get('stop_lat'))
-        stop_lon = float(request.args.get('stop_lon'))
-
-        bus = bus_locations.get(bus_id)
-        if not bus:
-            return jsonify({'error': 'Bus not found'}), 404
-
-        eta = calculate_eta(bus['lat'], bus['lon'], stop_lat, stop_lon)
-        return jsonify({'eta_minutes': eta})
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500

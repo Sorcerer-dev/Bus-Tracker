@@ -1,21 +1,28 @@
-from flask import Flask, jsonify, render_template_string
+from flask import Flask, jsonify, render_template_string, request
 from datetime import datetime
 import os
 from flask_cors import CORS
-from routes.location import location_bp
+from routes.location import location_bp, bus_locations
+from utils.eta import estimate_eta
 
 app = Flask(__name__)
 CORS(app)
+
+# Register routes from location.py
 app.register_blueprint(location_bp)
 
 @app.route('/')
 def home():
-    return "\U0001F68C Bus Tracking API is running!"
+    return "🚌 Bus Tracking API is running!"
 
+@app.route('/ping')
+def ping():
+    return {"status": "ok"}, 200
+
+# 🖥 Simple HTML live view for testing
 @app.route('/live')
 def live_view():
     bus_id = "BUS001"
-    from routes.location import bus_locations  # re-import to get updated values
     bus = bus_locations.get(bus_id)
 
     if not bus:
@@ -36,10 +43,28 @@ def live_view():
     </html>
     """
     return render_template_string(html)
-@app.route("/ping")
-def ping():
-    return {"status": "ok"}, 200
+
+# ⏱ ETA endpoint for React Native
+@app.route('/eta', methods=['POST'])
+def eta():
+    data = request.get_json()
+
+    bus_lat = data.get("bus_lat")
+    bus_lon = data.get("bus_lon")
+    stop_lat = data.get("user_lat")  # match RN naming
+    stop_lon = data.get("user_lon")
+
+    # Validate parameters
+    if None in [bus_lat, bus_lon, stop_lat, stop_lon]:
+        return jsonify({"error": "Missing required parameters"}), 400
+
+    try:
+        eta_minutes = estimate_eta(float(bus_lat), float(bus_lon), float(stop_lat), float(stop_lon))
+        return jsonify({"eta": eta_minutes})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port, debug=True)
